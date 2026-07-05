@@ -1,0 +1,43 @@
+global:
+  scrape_interval: 15s
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  #- job_name: 'gaia'
+  # static_configs:
+  #   - targets: ['host.docker.internal:26660']
+  #     labels:
+  #       chain: 'local-testnet'
+  #       node: 'test-node'
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'validator_node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  - job_name: 'gaia_node'
+    static_configs:
+      - targets: ['gaia_node:26660']
+
+        #  - job_name: 'centry_node'
+        #static_configs:
+        #- targets: ['173.249.35.245:26660']
+
+        #- job_name: 'full_node'
+        #static_configs:
+        #- targets: ['173.249.35.245:9100']

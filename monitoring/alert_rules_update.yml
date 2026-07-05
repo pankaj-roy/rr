@@ -1,0 +1,90 @@
+groups:
+  - name: node_exporter_alerts
+    rules:
+      - alert: HostHighCpuLoad
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 60
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ HIGH CPU USAGE"
+          description: "CPU usage is at {{ $value }}% (Threshold > 60%)"
+
+      - alert: HostCriticalCpuLoad
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 70
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🚨 CRITICAL CPU USAGE"
+          description: "CPU usage is at {{ $value }}% (Threshold > 70%)"
+
+      - alert: HostHighRamUsage
+        expr: ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes) * 100 > 70
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ HIGH RAM USAGE"
+          description: "RAM usage is at {{ $value }}% (Threshold > 70%)"
+
+      - alert: HostCriticalRamUsage
+        expr: ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes) * 100 > 80
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🚨 CRITICAL RAM USAGE"
+          description: "RAM usage is at {{ $value }}% (Threshold > 80%)"
+
+      - alert: HostDiskFillingUp
+        expr: (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 >= 70
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "💾 DISK USAGE HIGH"
+          description: "Disk storage is {{ $value }}% full (Threshold 70%)"
+
+  - name: gaia_node_alerts
+    rules:
+      - alert: GaiaNodeNotSynced
+        expr: cometbft_blocksync_syncing == 1 or cometbft_consensus_is_syncing == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔄 NODE NOT SYNCED"
+          description: "The Gaia node is currently catching up or out of sync."
+
+      - alert: GaiaBlockHeightStuck
+        expr: delta(cometbft_consensus_height[5m]) == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🚫 BLOCK HEIGHT STUCK"
+          description: "Block height has not increased in the last 5 minutes."
+
+      - alert: GaiaValidatorMissedBlocks
+        expr: increase(cometbft_consensus_validators_missed_blocks_total[5m]) >= 3
+        for: 1s
+        labels:
+          severity: critical
+        annotations:
+          summary: "❌ VALIDATOR MISSED BLOCKS"
+          description: "Validator has missed {{ $value }} blocks in the last 5 minutes."
+
+  - name: docker_individual_alerts
+    rules:
+      - alert: ContainerDown
+        # Logic: If the container hasn't been seen for more than 30 seconds, it's down.
+        # This keeps the 'name' label active even when the container is stopped.
+        expr: |
+          max by(name) (time() - container_last_seen > 60)
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🛑 CONTAINER DOWN: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} is not running or has disappeared."

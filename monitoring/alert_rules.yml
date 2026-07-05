@@ -1,0 +1,59 @@
+groups:
+  - name: SystemStatusAndRestarts
+    rules:
+      # 1. Notify if a Container Restarts
+      - alert: ContainerRestarted
+        expr: count by(name) (changes(container_start_time_seconds{name!=""}[5m]) > 0)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "🔄 Container Restarted: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} has restarted recently on {{ $labels.instance }}."
+
+      # 2. System Status Report (CPU, RAM, Disk)
+      
+      - alert: SystemStatusReport
+        expr: node_load1 >= 0
+        for: 1s
+        labels:
+          severity: info
+        annotations:
+          summary: "🖥️ 10-Min System Report"
+          description: |
+            <b>CPU:</b> {{ with query "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode='idle'}[1m])) * 100)" }}{{ . | first | value | printf "%.2f" }}{{ end }}%
+            <b>RAM:</b> {{ with query "((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes) * 100" }}{{ . | first | value | printf "%.2f" }}{{ end }}%
+            <b>Disk Free:</b> {{ with query "node_filesystem_avail_bytes{mountpoint='/'} / 1024 / 1024 / 1024" }}{{ . | first | value | printf "%.2f" }}{{ end }} GB
+
+      # --- 5 MINUTE INTERVAL REPORT ---
+      - alert: GaiaNodeStatus
+        expr: (cometbft_p2p_peers or tendermint_p2p_peers) >= 0
+        for: 1s
+        labels:
+          severity: info
+        annotations:
+          summary: "⚛️ 5-Min Gaia Status"
+          description: |
+            <b>Block Height:</b> {{ with query "cometbft_consensus_height or tendermint_consensus_height" }}{{ . | first | value | printf "%.0f" }}{{ end }}
+            <b>Total Peers:</b> {{ with query "cometbft_p2p_peers" }}{{ . | first | value | printf "%.0f" }}{{ end }}
+            <b>Sync Status:</b> {{ with query "cometbft_blocksync_syncing == 1 or cometbft_consensus_is_syncing == 1 or tendermint_consensus_is_syncing == 1" }}⚠️ Catching Up{{ else }}✅ Synced{{ end }}
+
+      # 3. Critical Alert: Container Down
+      - alert: ContainerStopped
+        expr: time() - container_last_seen{name!=""} > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "❌ Container Down: {{ $labels.name }}"
+          description: "Container {{ $labels.name }} has stopped on {{ $labels.instance }}."
+
+      # 4. CRITICAL: Node Stuck ---
+      - alert: GaiaNodeStuck
+        expr: delta(cometbft_consensus_height[5m]) == 0 or delta(tendermint_consensus_height[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🚨 Gaia Node Stuck!"
+          description: "Block height has not increased in the last 5 minutes. Node might be frozen."

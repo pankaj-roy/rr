@@ -1,0 +1,21 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'name']
+  group_wait: 40s
+  group_interval: 1m
+  repeat_interval: 3h
+  receiver: 'combined-receiver'
+
+receivers:
+- name: 'combined-receiver'
+  # --- MS TEAMS ---
+  msteamsv2_configs:
+  - webhook_url: 'https://defaultaf6eded8005446a784d4bb425fd9fb.5a.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/0f5ee6482dbc4c97b7b31fcace4e535f/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=0RTsMrKFe_LlIdPRM2v3fPHUf3hQjxBFdQj3HpYF0jk'
+    send_resolved: true
+    title: '{{ if eq .Status "firing" }}🚨 FIRING: ContainerDown{{ else }}✅ RESOLVED: ContainerDown{{ end }}'
+    text: |
+      **Status:** {{ .Status | toUpper }}
+      **Container:** {{ .CommonLabels.name }}
+      **Details:** {{ if eq .Status "firing" }}Container is not running.{{ else }}Container is back online.{{ end }}
